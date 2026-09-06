@@ -1,0 +1,63 @@
+<!-- 登录 / 注册弹窗：账号在服务端，口令哈希也在服务端；
+     「记住口令」只是浏览器本地的自动填充，混淆存放、等同明文。 -->
+<div id="login-mask" class="login-mask hidden">
+  <div class="login-box">
+    <div class="login-head">
+      <h3>登录 / 注册</h3>
+      <button id="login-close" type="button" class="login-x">×</button>
+    </div>
+
+    <p class="login-hint">
+      登录后会把你勾选过的菜记在这个账号下，推荐会越来越准；下次点昵称就能直接进来。
+      不登录也能用，只是不记口味。
+    </p>
+
+    <div id="acct-quick" class="quick-chips"></div>
+
+    <label class="login-field">
+      <span>昵称</span>
+      <input id="login-name" type="text" placeholder="如 李俊杰" autocomplete="username">
+    </label>
+
+    <label class="login-field">
+      <span>口令</span>
+      <input id="login-pwd" type="password" placeholder="至少 4 位" autocomplete="current-password">
+    </label>
+
+    <label class="login-remember">
+      <input id="login-remember" type="checkbox">
+      <span>记住口令（下次填昵称自动补上）</span>
+    </label>
+    <div id="login-fill" class="login-fill"></div>
+
+    <!-- 新增：选省份，选完立刻显示这个地方的主食和口味 -->
+    <label class="login-field">
+      <span>省份</span>
+      <select id="login-province">
+        <option value="">不指定</option>
+        {% for p in provinces %}
+        <option value="{{ p }}">{{ p }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div id="province-taste" class="province-taste hidden"></div>
+
+    <div id="login-msg" class="login-msg"></div>
+
+    <div class="login-actions">
+      <button id="login-go" type="button" class="login-go">登录 / 注册</button>
+      <button id="login-cancel" type="button" class="login-cancel">取消</button>
+    </div>
+
+    <p class="login-warn">
+      昵称不存在时会自动注册。口令哈希存在服务端 <code>data/accounts.json</code>，
+      只在本机校验、没有找回功能，别填你在别处用的密码。<br>
+      <b>「记住口令」只是混淆存放（不是加密）</b>，同机想看一样能还原；
+      换机器或把文件给别人之前，别勾这一项。<br>
+      省份只用来匹配主食口味提示，会跟着账号存在本机。
+    </p>
+  </div>
+</div>
+
+<!-- 省份 -> 主食/口味，给 login.js 做即时提示（和服务端同一份数据） -->
+<script id="region-data" type="application/json">{{ regions|tojson }}</script>

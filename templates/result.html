@@ -10,7 +10,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script defer src="https://use.fontawesome.com/releases/v5.1.0/js/all.js" integrity="sha384-3LK/3kTpDE/Pkp8gTNp2gR/2gOiwQ6QaO7Td0zV76UFJVhqLl4Vl3KL1We6q6wR9" crossorigin="anonymous"></script>
 
-  <script src="main.js"></script>
+  <!-- 右上角账号按钮与登录弹窗的逻辑 -->
+  <script src="{{ url_for('static', filename='login.js') }}"></script>
 </head>
 <body>
   <div class="wrapper">
@@ -27,11 +28,31 @@
         <a href="/">Quiz</a>
         <a target="_blank" href="https://garrrychan.github.io/blog/">Portfolio</a>
       </nav>
+
+      <!-- 新增：右上角账号（昵称 + 口令，可记住口令下次自动填充） -->
+      <div id="acct" class="acct">
+        <button id="acct-btn" type="button" class="acct-btn"
+                data-logged="{{ '1' if user else '0' }}">
+          {% if user %}👤 {{ user }}{% else %}👤 登录 / 注册{% endif %}
+        </button>
+        <div id="acct-menu" class="acct-menu hidden">
+          <div class="acct-menu-title">当前账号：{{ user }}</div>
+          <button id="acct-switch" type="button">🔁 切换 / 新建账号</button>
+          <button id="acct-logout" type="button">🚪 退出登录</button>
+        </div>
+      </div>
     </header>
     <!-- END OF HEADER -->
 
+    {% include "login.html" %}
+
     <!-- MAIN CONTAINER -->
     <section class="main-container" >
+      {% if region %}
+      <div class="region-banner" title="按你登录时选的省份自动匹配">
+        📍 {{ region.province }}　·　主食：{{ region.staple }}　·　口味：{{ region.taste }}
+      </div>
+      {% endif %}
       <div class="location" id="home">
         <!-- add video link after -->
         <!-- remove most popular, focus on recommender algos -->

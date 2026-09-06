@@ -1,4 +1,5 @@
 # EDA
+import os
 import pandas as pd
 import numpy as np
 from random import sample
@@ -7,6 +8,13 @@ import ast
 import re
 import random
 import pickle
+
+# 数据路径按文件位置算，从哪个目录启动都能找到（原来是 "./data/..."，必须在项目目录里跑）
+BASE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _p(*parts):
+    return os.path.join(BASE, *parts)
 
 # modelling & evaluation
 from sklearn.metrics.pairwise import cosine_similarity
@@ -22,11 +30,11 @@ np.set_printoptions(suppress=True)
 pd.options.display.float_format = '{:.2f}'.format
 
 # load data / global variables
-all_users = pd.read_csv("./data/users/all_users.csv")
+all_users = pd.read_csv(_p("data", "users", "all_users.csv"))
 all_users.drop_duplicates(inplace=True)
-all_recipes = pd.read_csv("./data/recipes/all_recipes.csv")
+all_recipes = pd.read_csv(_p("data", "recipes", "all_recipes.csv"))
 all_recipes.drop_duplicates(inplace=True)
-photo_urls = pd.read_csv("./data/photo_url/photo_urls.csv")
+photo_urls = pd.read_csv(_p("data", "photo_url", "photo_urls.csv"))
 photo_urls.drop_duplicates(inplace=True)
 recipe_lookup = all_recipes[["recipe_id","title"]]
 
@@ -35,7 +43,24 @@ recipe_lookup = all_recipes[["recipe_id","title"]]
 # at_least_3_ids = list(ratings_by_user[ratings_by_user["rating"]>=3].reset_index().user_id)
 # users3 = all_users[all_users.user_id.isin(at_least_3_ids)][["user_id","recipe_id","rating"]]
 # pickle.dump(users3, open("users3.pkl", "wb"))
-users3 = pickle.load(open("./pickle/users3.pkl","rb"))
+# pickle 是旧 pandas 生成的，新版 pandas 读不出来（ModuleNotFoundError: pandas.core.indexes.numeric）
+# 读不出来时按原来的口径从 all_users.csv 重算，结果与 pickle 完全一致（16831 行、3211 个用户）
+def load_users3():
+    try:
+        return pickle.load(open(_p("pickle", "users3.pkl"), "rb"))
+    except Exception:
+        ratings_by_user = all_users.groupby(["user_id", "username"])[["rating"]].count().sort_values("rating", ascending=False)
+        at_least_3_ids = list(ratings_by_user[ratings_by_user["rating"] >= 3].reset_index().user_id)
+        return all_users[all_users.user_id.isin(at_least_3_ids)][["user_id", "recipe_id", "rating"]]
+
+
+users3 = load_users3()
+
+
+def sample_up_to(items, n=6):
+    """候选不足 n 个时 random.sample 会抛 ValueError，这里改成有多少取多少"""
+    items = list(items)
+    return sample(items, min(n, len(items)))
 
 class utils:
     def __init__(self,all_recipes):
@@ -102,7 +127,9 @@ class utils:
         ''' Returns a string of all unique categories of recipes
         count_categories(all_recipes)
         '''
-        all_recipes_df.dropna(axis=0,how='any',inplace=True)
+        # 原来这里 inplace=True 会把全局 all_recipes 改小（去掉 12 道缺类目的菜），
+        # 导致第一次请求之后这几道菜查不到 id、点下去直接 500。改成在副本上操作。
+        all_recipes_df = all_recipes_df.dropna(axis=0, how='any')
         recipe_categories = all_recipes.drop(["title","category","ingredients"],axis=1)
         categories = []
         # ast.literal turns str rep of list into list
@@ -138,7 +165,7 @@ class utils:
                 sample_list.extend(recipes)
             except:
                 pass
-        return random.sample(sample_list,6)
+        return sample_up_to(sample_list)
 
 def create_X(df):
     """
@@ -207,7 +234,7 @@ class recommenders:
 
         '''
 
-        similarity_matrix = pickle.load(open("./pickle/similarity_matrix.pkl", "rb"))
+        similarity_matrix = pickle.load(open(_p("pickle", "similarity_matrix.pkl"), "rb"))
         user = user_mapper[user_id]
         # negate for most similar
         similar_users = np.argsort(-similarity_matrix[user])[1:11] # remove original user, peak at top 10 similar users
@@ -227,7 +254,7 @@ class recommenders:
         new_picks = [pick for pick in picks if pick not in utils.known_positives(user_id,threshold,new_user)]
 
         # remove duplicates & sample 6
-        return sample(set(new_picks),6)
+        return sample_up_to(set(new_picks))
 
     def quiz_user_user_recommender(new_user):
         '''
@@ -253,7 +280,7 @@ class recommenders:
         recommenders.item_item_recommender(title="Chef John's Italian Meatballs", new_user=utils.create_new_user(quiz_results))
         '''
 
-        cosine_sim = pickle.load(open("./pickle/cosine_sim.pkl","rb"))
+        cosine_sim = pickle.load(open(_p("pickle", "cosine_sim.pkl"), "rb"))
 
         recipe_idx = dict(zip(all_recipes['title'], list(all_recipes.index)))
         idx = recipe_idx[title]
@@ -265,7 +292,7 @@ class recommenders:
             dissimilar_recipes_idx = [i[0] for i in sim_scores]
             picks = list(all_recipes['title'].iloc[dissimilar_recipes_idx])
             new_picks = [pick for pick in picks if pick not in utils.known_positives(user_id,threshold,new_user)]
-            return sample(new_picks[0:100],6)
+            return sample_up_to(new_picks[0:100])
 
         else:
             sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
@@ -275,7 +302,7 @@ class recommenders:
             # filter out items chosen, by default filter out new user 8888888
             new_picks = [pick for pick in picks if pick not in utils.known_positives(user_id,threshold,new_user)]
             # choose the top 6 from ranked new_picks to display
-            return sample(new_picks[0:10],6)
+            return sample_up_to(new_picks[0:10])
 
     def svd_recommender(user_id, new_user=None, threshold=3):
         '''
@@ -355,8 +382,8 @@ mean_rating_per_recipe = sum_ratings_per_recipe/n_ratings_per_recipe
 X_mean_recipe = np.tile(mean_rating_per_recipe, (X.shape[0],1))
 X_norm = X - csr_matrix(X_mean_recipe)
 
-X_train_norm = X_norm.todense()[0:2400]
-X_test_norm = X_norm.todense()[2400:]
+X_train_norm = np.asarray(X_norm.todense())[0:2400]
+X_test_norm = np.asarray(X_norm.todense())[2400:]
 
 ### Naive model ###
 naive_preds = np.tile(0,(3211,1053))
@@ -377,11 +404,11 @@ U, Sigma, VT = randomized_svd(X_norm,
                               random_state=None)
 
 def rank_k(k):
-    U_reduced = np.mat(U[:,:k])
-    VT_reduced = np.mat(VT[:k,:])
+    U_reduced = np.asarray(U[:,:k])
+    VT_reduced = np.asarray(VT[:k,:])
     Sigma_reduced = Sigma_reduced = np.eye(k)*Sigma[:k]
     Sigma_sqrt = np.sqrt(Sigma_reduced)
-    return U_reduced*Sigma_sqrt, Sigma_reduced, Sigma_sqrt*VT_reduced
+    return U_reduced @ Sigma_sqrt, Sigma_reduced, Sigma_sqrt @ VT_reduced
 
 U_reduced, Sigma_reduced, VT_reduced = rank_k(30)
 
