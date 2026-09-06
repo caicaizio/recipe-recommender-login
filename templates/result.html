@@ -53,6 +53,23 @@
         📍 {{ region.province }}　·　主食：{{ region.staple }}　·　口味：{{ region.taste }}
       </div>
       {% endif %}
+      {% if regional %}
+      <div class="regional">
+        <h3>🍜 合你口味的菜 · {{ region.province }}</h3>
+        <div class="picks-row">
+          {% for r in regional %}
+          <div class="pick">
+            <img src="{{ r.url }}" alt="{{ r.title }}">
+            <p>{{ r.title }}</p>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="picks-note">
+          按菜名和配料里的口味关键词匹配（{{ region.taste }}）；
+          菜谱库是英文西餐，不是中餐，仅供参考。
+        </p>
+      </div>
+      {% endif %}
       <div class="location" id="home">
         <!-- add video link after -->
         <!-- remove most popular, focus on recommender algos -->

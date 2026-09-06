@@ -7,6 +7,7 @@ from model import recommenders, utils
 
 import accounts                     # 新增：昵称 + 口令的账号（数据存 data/accounts.json）
 import regions                      # 新增：省份 -> 主食 / 口味
+import region_picks                 # 新增：按省份口味从菜谱库里挑菜
 
 app = Flask(__name__)
 # Flask 的 session 需要密钥；没设 SECRET_KEY 就随机生成一个（重启后登录态失效）
@@ -25,16 +26,31 @@ def current_user():
     return name if name and accounts.exists(name) else ""
 
 
+def current_province():
+    """当前登录账号选的省份；没登录或没选就是 "" """
+    name = current_user()
+    return accounts.province(name) if name else ""
+
+
 def current_region():
     """当前账号选的省份 + 匹配到的主食口味；没登录或没选就是 None"""
-    name = current_user()
-    if not name:
-        return None
-    province = accounts.province(name)
+    province = current_province()
     taste = regions.taste_of(province)
     if not taste:
         return None
     return {"province": province, "staple": taste["staple"], "taste": taste["taste"]}
+
+
+@app.route("/api/region-picks")
+def api_region_picks():
+    """选了省份之后：返回符合这个口味的几道菜（登录框即时显示、首页也用）"""
+    province = (request.args.get("province") or "").strip()
+    try:
+        n = max(1, min(12, int(request.args.get("n", 6))))
+    except ValueError:
+        n = 6
+    return jsonify({"province": province,
+                    "recipes": region_picks.picks_for(province, n)})
 
 
 @app.route("/api/me")
@@ -144,6 +160,7 @@ def quiz():
         title = title,
         user = user,
         region = current_region(),
+        regional = region_picks.picks_for(current_province(), 6),
 
         cats = (list([cat1,cat2]), cats_recommended, [utils.get_url(utils.title_to_id(recipe)) for recipe in cats_recommended[0]], [utils.get_url(utils.title_to_id(recipe)) for recipe in cats_recommended[1]]),
         # tuple, second element is the image url
@@ -171,7 +188,8 @@ def quiz():
     return render_template("quiz.html",
     most_popular=(most_popular,[utils.get_url(utils.title_to_id(recipe)) for recipe in most_popular]),
     user=user,
-    region=current_region()
+    region=current_region(),
+    regional=region_picks.picks_for(current_province(), 6)
     )
 
 if __name__ == '__main__':

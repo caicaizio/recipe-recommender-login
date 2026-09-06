@@ -139,6 +139,36 @@
     box.appendChild(make("div", "taste-line", "主食：" + r.staple));
     box.appendChild(make("div", "taste-line", "口味：" + r.taste));
     box.classList.remove("hidden");
+    loadRegionPicks(p);
+  }
+
+  // 选完省份再去后端要几道符合这个口味的菜（关键词匹配，不是模型推荐）
+  function loadRegionPicks(province) {
+    var box = el("province-picks");
+    if (!box) return;
+    box.innerHTML = "";
+    box.classList.add("hidden");
+    api("/api/region-picks?province=" + encodeURIComponent(province) + "&n=3")
+      .then(function (d) {
+        var list = d.recipes || [];
+        if (!list.length) return;
+        box.appendChild(make("div", "picks-title", "合这个口味的菜："));
+        var row = make("div", "picks-row");
+        list.forEach(function (r) {
+          var card = make("div", "pick");
+          var img = make("img");
+          img.src = r.url;
+          img.alt = r.title;
+          card.appendChild(img);
+          card.appendChild(make("p", null, r.title));
+          row.appendChild(card);
+        });
+        box.appendChild(row);
+        box.appendChild(make("div", "picks-note",
+          "按口味关键词匹配，菜谱库是英文西餐，仅供参考"));
+        box.classList.remove("hidden");
+      })
+      .catch(function () { /* 拉不到就算了，口味提示已经显示了 */ });
   }
   function closeLogin() { el("login-mask").classList.add("hidden"); }
 
